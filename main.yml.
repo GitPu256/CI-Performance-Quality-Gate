@@ -14,28 +14,27 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
+      - name: Debug - Show folder structure
+        run: ls -la
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
           cache: 'npm'
-          cache-dependency-path: my-web-app/package-lock.json   # No leading ./
+          cache-dependency-path: my-web-app/package-lock.json
 
       - name: Install Dependencies
-        working-directory: my-web-app
-        run: npm ci   # Use ci for faster, reproducible installs
+        run: cd my-web-app && npm ci
 
       - name: Lint
-        working-directory: my-web-app
-        run: npm run lint
+        run: cd my-web-app && npm run lint
 
       - name: Test
-        working-directory: my-web-app
-        run: npm run test
+        run: cd my-web-app && npm run test
 
       - name: Build Application
-        working-directory: my-web-app
-        run: npm run build
+        run: cd my-web-app && npm run build
 
   performance-audit:
     name: Lighthouse Performance Audit
@@ -45,6 +44,9 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
+      - name: Debug - Show folder structure
+        run: ls -la
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
@@ -52,18 +54,14 @@ jobs:
           cache: 'npm'
           cache-dependency-path: my-web-app/package-lock.json
 
-      - name: Build & Start Server
-        working-directory: my-web-app
+      - name: Build & Start Server + Lighthouse
         run: |
+          cd my-web-app
           npm ci
           npm run build
           npm start &
           npx wait-on http://localhost:3000 --timeout 60000
-
-      - name: Run Lighthouse Audit
-        uses: treosh/lighthouse-ci-action@v10
-        with:
-          urls: |
-            http://localhost:3000
-          uploadArtifacts: true
-          temporaryPublicStorage: true
+          npx lighthouse-ci-action \
+            --urls=http://localhost:3000 \
+            --uploadArtifacts=true \
+            --temporaryPublicStorage=true
