@@ -7,16 +7,9 @@ on:
     branches: [ main, develop ]
 
 jobs:
-  # ============================================================
-  # JOB 1: VALIDATION GATE
-  # ============================================================
   build-and-test:
     name: Build, Lint & Test
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: ./my-web-app 
-
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
@@ -26,35 +19,27 @@ jobs:
         with:
           node-version: '20'
           cache: 'npm'
+          # This tells GitHub to look for the lockfile in the sub-folder
           cache-dependency-path: './my-web-app/package-lock.json'
 
       - name: Install Dependencies
+        working-directory: ./my-web-app
         run: npm install
 
       - name: Build Application
+        working-directory: ./my-web-app
         run: npm run build
 
-  # ============================================================
-  # JOB 2: PERFORMANCE GATE
-  # ============================================================
   performance-audit:
     name: Lighthouse Performance Audit
     needs: build-and-test
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: ./my-web-app # Ensure second job also looks in sub-folder
-
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-
       - name: Build & Start Server
+        working-directory: ./my-web-app
         run: |
           npm install
           npm run build
