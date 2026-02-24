@@ -1,6 +1,5 @@
-name: CI Performance & Quality Gate
+name: CI & Performance Gate + Deploy
 
-# Trigger the workflow on pushes or pull requests to key branches
 on:
   push:
     branches: [ main, develop ]
@@ -10,39 +9,55 @@ on:
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
-
     steps:
-    - name: Checkout Code
-      uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-    - name: Set up Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: '20'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: my-web-app/package-lock.json
 
-    - name: Install Dependencies
-      run: npm install
+      - name: Install Dependencies
+        run: cd my-web-app && npm ci
 
-    - name: Run Backend API Tests
-      # Ensures data manipulation logic is correct and API response mocks are valid
-      run: npm test -- --testPathPattern=backend
+      - name: Lint & Test
+        run: cd my-web-app && npm run lint && npm run test
 
-    - name: Run Frontend Performance Linting
-      # Identifies inefficient component hierarchies or heavy assets early
-      run: npm run lint
-
-    - name: Build Project
-      # Verifies that the application compiles correctly
-      run: npm run build
+      - name: Build
+        run: cd my-web-app && npm run build
 
   performance-audit:
     needs: build-and-test
     runs-on: ubuntu-latest
     steps:
-    - name: Audit Frontend Performance (Lighthouse)
-      # Specifically targets "frontend lag" by checking bundle sizes and render times
-      uses: treosh/lighthouse-ci-action@v10
-      with:
-        urls: |
-          http://localhost:3000/
-        uploadArtifacts: true # Save results for the team to review
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Start Server & Run Lighthouse Audit
+        run: |
+          cd my-web-app
+          npm ci
+          npm run build
+          npm start &
+          npx wait-on http://localhost:3000 --timeout 60000
+          npx lighthouse-ci-action --urls=http://localhost:3000 --uploadArtifacts=true --temporaryPublicStorage=true
+
+  deploy:
+    needs: [build-and-test, performance-audit]
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - run: cd my-web-app && npm ci && npm run build
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./my-web-app/build
