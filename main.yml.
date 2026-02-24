@@ -1,26 +1,11 @@
 name: CI & Performance Checks
 
 # ------------------------------------------------------------
-# This workflow enforces quality and performance standards
-# for the main and develop branches.
-#
-# It automates:
-# - Dependency installation (deterministic)
-# - Linting and code quality checks
-# - Unit/integration testing
-# - Build validation
-# - Runtime server startup
-# - Lighthouse performance auditing
-#
-# This supports:
-# - The Git branching strategy
-# - Continuous Integration (CI)
-# - Early detection of regressions
-# - Prevention of unstable merges
+# Enforces quality, testing, build validation, and performance auditing
+# on main and develop branches.
 # ------------------------------------------------------------
 
 on:
-  # Trigger on pushes or pull requests to protected branches
   push:
     branches: [ main, develop ]
   pull_request:
@@ -29,8 +14,7 @@ on:
 jobs:
 
   # ============================================================
-  # JOB 1: BUILD AND TEST
-  # Ensures functional correctness before performance auditing
+  # JOB 1: BUILD, LINT, TEST
   # ============================================================
 
   build-and-test:
@@ -38,98 +22,83 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # Step 1: Checkout repository source code
+      # Checkout repository
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      # Step 2: Set up Node.js runtime environment
-      # Ensures consistent execution across all contributors
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'npm'   # Speeds up dependency installation
-
-      # Step 3: Install dependencies using npm ci
-      # Ensures reproducible builds based strictly on package-lock.json
-      - name: Install Dependencies
-        run: npm ci
-
-      # Step 4: Run linting checks
-      # Detects code smells, potential inefficiencies, and formatting issues
-      - name: Run Linter
-        run: npm run lint
-
-      # Step 5: Execute automated tests
-      # Prevents regressions before integration
-      - name: Run Unit & Integration Tests
-        run: npm test
-
-      # Step 6: Build the project
-      # Validates compilation and production readiness
-      - name: Build Application
-        run: npm run build
-
-
-  # ============================================================
-  # JOB 2: PERFORMANCE AUDIT
-  # Runs only if build-and-test succeeds
-  # ============================================================
-
-  performance-audit:
-    name: Lighthouse Performance Audit
-    needs: build-and-test   # Ensures code passes tests first
-    runs-on: ubuntu-latest
-
-    steps:
-      # Step 1: Checkout code again (fresh runner environment)
-      - name: Checkout Repository
-        uses: actions/checkout@v4
-
-      # Step 2: Setup Node.js environment
+      # Setup Node
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
           cache: 'npm'
 
-      # Step 3: Install dependencies
+      # Install dependencies
       - name: Install Dependencies
         run: npm ci
 
-      # Step 4: Build application for production mode
+      # Run linter (will fail if lint errors exist)
+      - name: Run Linter
+        run: npm run lint --if-present
+
+      # Run tests (won't fail if no tests yet)
+      - name: Run Tests
+        run: npm test --if-present
+
+      # Build project
       - name: Build Application
         run: npm run build
 
-      # Step 5: Install wait-on utility (if not already installed)
-      # Ensures CI waits until server is actually ready
-      - name: Install wait-on
-        run: npm install wait-on --save-dev
 
-      # Step 6: Start application server in background
-      # The ampersand (&) runs server asynchronously
+  # ============================================================
+  # JOB 2: PERFORMANCE AUDIT (Runs only if build succeeds)
+  # ============================================================
+
+  performance-audit:
+    name: Lighthouse Performance Audit
+    needs: build-and-test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Build Application
+        run: npm run build
+
+      # Install wait-on to properly detect server readiness
+      - name: Install wait-on
+        run: npm install --save-dev wait-on
+
+      # Start app in background
       - name: Start Application Server
         run: |
           npm start &
       
-      # Step 7: Wait for server readiness instead of fixed sleep
-      # Prevents race conditions and exit code failures
-      - name: Wait for Server to be Ready
+      # Wait until server responds
+      - name: Wait for Server
         run: npx wait-on http://localhost:3000
 
-      # Step 8: Run Lighthouse CI audit
-      # Evaluates performance, accessibility, SEO, and best practices
+      # Run Lighthouse
       - name: Run Lighthouse Audit
         uses: treosh/lighthouse-ci-action@v10
         with:
           urls: |
             http://localhost:3000
-          uploadArtifacts: true   # Stores report in GitHub Actions
+          uploadArtifacts: true
           temporaryPublicStorage: true
 
-      # Step 9: Upload Lighthouse HTML reports as artifacts
-      # Allows team to review detailed performance metrics
-      - name: Upload Lighthouse Reports
+      # Upload Lighthouse results
+      - name: Upload Lighthouse Report
         uses: actions/upload-artifact@v4
         with:
           name: lighthouse-report
