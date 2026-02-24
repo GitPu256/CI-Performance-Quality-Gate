@@ -7,9 +7,16 @@ on:
     branches: [ main, develop ]
 
 jobs:
+  # ============================================================
+  # JOB 1: VALIDATION GATE
+  # ============================================================
   build-and-test:
     name: Build, Lint & Test
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./my-web-app 
+
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
@@ -19,17 +26,25 @@ jobs:
         with:
           node-version: '20'
           cache: 'npm'
+          cache-dependency-path: './my-web-app/package-lock.json'
 
       - name: Install Dependencies
-        run: npm install  # Use install if 'npm ci' fails due to missing lockfile
+        run: npm install
 
       - name: Build Application
         run: npm run build
 
+  # ============================================================
+  # JOB 2: PERFORMANCE GATE
+  # ============================================================
   performance-audit:
     name: Lighthouse Performance Audit
     needs: build-and-test
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./my-web-app # Ensure second job also looks in sub-folder
+
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
@@ -44,13 +59,11 @@ jobs:
           npm install
           npm run build
           npm start & 
-        # The '&' runs the server in the background so the next step can run
-      
-      
+          npx wait-on http://localhost:3000 --timeout 60000
 
       - name: Run Lighthouse Audit
         uses: treosh/lighthouse-ci-action@v10
-        continue-on-error: true # Allows the job to finish even if performance is 'Emerging'
+        continue-on-error: true 
         with:
           urls: |
             http://localhost:3000
