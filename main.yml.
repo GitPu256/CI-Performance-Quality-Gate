@@ -1,6 +1,10 @@
-name: CI Performance & Quality Gate
+name: CI & Performance Checks
 
-# Trigger the workflow on pushes or pull requests to key branches
+# This workflow supports the Git branching strategy by automating testing and performance checks
+# on key branches (main and develop). It ensures code quality, avoids merge conflicts,
+# and identifies performance bottlenecks before integration.
+
+# Trigger workflow on pushes or pull requests to main and develop branches
 on:
   push:
     branches: [ main, develop ]
@@ -12,37 +16,47 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout Code
-      uses: actions/checkout@v4
+      # Step 1: Checkout repository code
+      - name: Checkout Code
+        uses: actions/checkout@v4
 
-    - name: Set up Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: '20'
+      # Step 2: Setup Node.js environment for consistent builds
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
 
-    - name: Install Dependencies
-      run: npm install
+      # Step 3: Install project dependencies
+      - name: Install Dependencies
+        run: npm install
 
-    - name: Run Backend API Tests
-      # Ensures data manipulation logic is correct and API response mocks are valid
-      run: npm test -- --testPathPattern=backend
+      # Step 4: Run backend tests to validate API and data manipulation logic
+      - name: Run Backend API Tests
+        run: npm test -- --testPathPattern=backend
 
-    - name: Run Frontend Performance Linting
-      # Identifies inefficient component hierarchies or heavy assets early
-      run: npm run lint
+      # Step 5: Lint frontend code to detect inefficient components and potential performance issues
+      - name: Run Frontend Performance Linting
+        run: npm run lint
 
-    - name: Build Project
-      # Verifies that the application compiles correctly
-      run: npm run build
+      # Step 6: Build the project to verify compilation and readiness for deployment
+      - name: Build Project
+        run: npm run build
 
   performance-audit:
     needs: build-and-test
     runs-on: ubuntu-latest
+
     steps:
-    - name: Audit Frontend Performance (Lighthouse)
-      # Specifically targets "frontend lag" by checking bundle sizes and render times
-      uses: treosh/lighthouse-ci-action@v10
-      with:
-        urls: |
-          http://localhost:3000/
-        uploadArtifacts: true # Save results for the team to review
+      # Step 1: Checkout code for performance auditing
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      # Step 2: Audit frontend performance using Lighthouse CI
+      # This evaluates metrics like bundle size, render time, and overall responsiveness,
+      # ensuring that frontend performance remains optimized as features are integrated.
+      - name: Audit Frontend Performance (Lighthouse)
+        uses: treosh/lighthouse-ci-action@v10
+        with:
+          urls: |
+            http://localhost:3000/
+          uploadArtifacts: true  # Save results for team review
