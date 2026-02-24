@@ -1,4 +1,4 @@
-name: CI & Performance Checks
+name: CI & Performance Gate
 
 on:
   push:
@@ -8,60 +8,41 @@ on:
 
 jobs:
   build-and-test:
-    name: Build, Lint & Test
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Debug - Show folder structure
-        run: ls -la
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: '20'
           cache: 'npm'
-          cache-dependency-path: my-web-app/package-lock.json
+
+      - name: Debug folder structure
+        run: ls -la
 
       - name: Install Dependencies
-        run: cd my-web-app && npm ci
+        run: npm ci
 
-      - name: Lint
-        run: cd my-web-app && npm run lint
+      - name: Lint & Test
+        run: npm run lint && npm run test
 
-      - name: Test
-        run: cd my-web-app && npm run test
-
-      - name: Build Application
-        run: cd my-web-app && npm run build
+      - name: Build
+        run: npm run build
 
   performance-audit:
-    name: Lighthouse Performance Audit
     needs: build-and-test
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Debug - Show folder structure
-        run: ls -la
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'npm'
-          cache-dependency-path: my-web-app/package-lock.json
 
-      - name: Build & Start Server + Lighthouse
+      - name: Start Server & Lighthouse Audit
         run: |
-          cd my-web-app
           npm ci
           npm run build
           npm start &
           npx wait-on http://localhost:3000 --timeout 60000
-          npx lighthouse-ci-action \
-            --urls=http://localhost:3000 \
-            --uploadArtifacts=true \
-            --temporaryPublicStorage=true
+          npx lighthouse-ci-action --urls=http://localhost:3000 --uploadArtifacts=true --temporaryPublicStorage=true
